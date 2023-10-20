@@ -172,9 +172,9 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
             optimizer.step()
             optimizer.zero_grad()
   
-            orig_image_path = f"./original_images/{epoch}_{k}.jpg"
-            trained_image_path = f"./trained_images/{epoch}_{k}.jpg"
-            anomaly_image_path = f"./anomaly_images/{epoch}_{k}.jpg"
+            # orig_image_path = f"./original_images/{epoch}_{k}.jpg"
+            # trained_image_path = f"./trained_images/{epoch}_{k}.jpg"
+            # anomaly_image_path = f"./anomaly_images/{epoch}_{k}.jpg"
 
             # Add images to Tensorboard and save to a directory
             # add_images_to_tensorboard_and_save(writer, orig_image_path, trained_image_path, anomaly_image_path, step)
