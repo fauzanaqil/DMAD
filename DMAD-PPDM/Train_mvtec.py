@@ -1,17 +1,19 @@
-import torch
-from dataset import get_data_transforms
-from torchvision.datasets import ImageFolder
-import numpy as np
-import random
 import os
 import cv2
-from resnet import wide_resnet50_2
-from de_resnet import de_wide_resnet50_2
-from dataset import MVTecDataset
-from test import evaluation
-from torch.nn import functional as F
+import time
+import torch
+import random
+import numpy as np
 import torch.optim as optim
 import torchvision.utils as vutils
+
+from test import evaluation
+from dataset import MVTecDataset
+from resnet import wide_resnet50_2
+from torch.nn import functional as F
+from dataset import get_data_transforms
+from de_resnet import de_wide_resnet50_2
+from torchvision.datasets import ImageFolder
 from torch.utils.tensorboard import SummaryWriter
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
@@ -53,11 +55,52 @@ def loss_concat(a, b):
     loss += torch.mean(1 - cos_loss(a_map, b_map))
     return loss
 
+# def calculate_anomaly_image(orig_image_path, trained_image_path, anomaly_image_path):
+#     orig_image = cv2.imread(orig_image_path)
+#     trained_image = cv2.imread(trained_image_path)
+
+#     anomaly_image = cv2.absdiff(orig_image, trained_image)
+#     cv2.imwrite(anomaly_image_path, anomaly_image)
+
+# def add_anomaly_image_to_tensorboard(writer, orig_image_path, trained_image_path, anomaly_image_path, step):
+#     orig_image = cv2.imread(orig_image_path)
+#     trained_image = cv2.imread(trained_image_path)
+#     anomaly_image = cv2.imread(anomaly_image_path)
+
+#     orig_image_tensor = torch.from_numpy(orig_image).permute(2, 0, 1)
+#     trained_image_tensor = torch.from_numpy(trained_image).permute(2, 0, 1)
+#     anomaly_image_tensor = torch.from_numpy(anomaly_image).permute(2, 0, 1)
+
+#     writer.add_image("Original Image", orig_image_tensor, global_step=step)
+#     writer.add_image("Trained Image", trained_image_tensor, global_step=step)
+#     writer.add_image("Anomaly Image", anomaly_image_tensor, global_step=step)
+
+def add_images_to_tensorboard_and_save(writer, orig_image_path, trained_image_path, anomaly_image_path, step):
+    orig_image = cv2.imread(orig_image_path)
+    if orig_image is not None:
+        trained_image = cv2.imread(trained_image_path)
+        anomaly_image = cv2.imread(anomaly_image_path)
+
+        orig_image_tensor = torch.from_numpy(orig_image).permute(2, 0, 1)
+        trained_image_tensor = torch.from_numpy(trained_image).permute(2, 0, 1)
+        anomaly_image_tensor = torch.from_numpy(anomaly_image).permute(2, 0, 1)
+
+        # Add images to Tensorboard
+        writer.add_image("Original Image", orig_image_tensor, global_step=step)
+        writer.add_image("Trained Image", trained_image_tensor, global_step=step)
+        writer.add_image("Anomaly Image", anomaly_image_tensor, global_step=step)
+
+        # Save images to a directory
+        os.makedirs("images_to_save", exist_ok=True)
+        cv2.imwrite(f"images_to_save/original_{step}.jpg", orig_image)
+        cv2.imwrite(f"images_to_save/trained_{step}.jpg", trained_image)
+        cv2.imwrite(f"images_to_save/anomaly_{step}.jpg", anomaly_image)
+    else:
+        print(f"Failed to load the original image at path: {orig_image_path}")
+
 def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom=None, tensorboard_log_dir='./runs/DMAD/'):
     print(_class_)
-    epochs = 400
-    learning_rate = 0.005
-    batch_size = 8
+    epochs = 200
     image_size = 256
     mode = "sp"
     gamma = 1
@@ -92,27 +135,24 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
 
     step = 0
     for epoch in range(epochs):
+        start_time = time.time()
         losses = []
 
         offset.train()
         bn.train()
         decoder.train()
         loss_rec = {"main": [0], "offset": [0], "vq": [0]}
-        accumulation_steps = 4  # You can adjust this value
+        accumulation_steps = 10
         for k, (img, label) in enumerate(train_dataloader):
+            cv2.imshow("Original Image", img[0].cpu().numpy().transpose(1, 2, 0) * 255)
+            cv2.waitKey(0)  # Wait until a key is pressed
+            cv2.destroyAllWindows()
+
             img = img.to(device)
             _, img_, offset_loss = offset(img)
             inputs = encoder(img_)
             vq, vq_loss = bn(inputs)
             outputs = decoder(vq)
-
-            resized_outputs = [F.interpolate(output, size=img.shape[2:], mode='bilinear', align_corners=True) for output in outputs]
-            outputs_concatenated = torch.cat(resized_outputs, dim=1)
-            single_img = img[0:1, :, :, :]
-            single_img_resized = F.interpolate(single_img, size=(outputs_concatenated.shape[2], outputs_concatenated.shape[3]), mode='bilinear', align_corners=True)
-            single_channel_img = single_img_resized[:, 0:1, :, :]
-            visualization_images = torch.cat([single_channel_img, outputs_concatenated[0:1, 0:1, :, :]], dim=3)
-            writer.add_image("Image Visualization", vutils.make_grid(visualization_images, nrow=4, normalize=True), global_step=step)
 
             main_loss = loss_function(inputs, outputs)
             loss = main_loss + offset_loss + vq_loss
@@ -123,9 +163,21 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
             optimizer.zero_grad()
             loss.backward()
 
-            if (k + 1) % accumulation_steps == 0:
-                optimizer.step()
-                optimizer.zero_grad()
+            # Save the trained image
+            trained_image = outputs[0].cpu().detach().numpy().transpose(1, 2, 0)
+            trained_image = (trained_image * 255).astype(np.uint8)
+            cv2.imwrite("trained_image.jpg", trained_image)
+
+            # if (k + 1) % accumulation_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+  
+            orig_image_path = f"./original_images/{epoch}_{k}.jpg"
+            trained_image_path = f"./trained_images/{epoch}_{k}.jpg"
+            anomaly_image_path = f"./anomaly_images/{epoch}_{k}.jpg"
+
+            # Add images to Tensorboard and save to a directory
+            # add_images_to_tensorboard_and_save(writer, orig_image_path, trained_image_path, anomaly_image_path, step)
             
             loss_rec["main"].append(main_loss.item())
             loss_rec["offset"].append(offset_loss.item())
@@ -133,8 +185,12 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
                 loss_rec["vq"].append(vq_loss.item())
             except:
                 loss_rec["vq"].append(0)
-        
-        print('epoch [{}/{}], main_loss:{:.4f}, offset_loss:{:.4f}, vq_loss:{:.4f}'.format(epoch + 1, epochs, np.mean(loss_rec["main"]), np.mean(loss_rec["offset"]), np.mean(loss_rec["vq"])))
+        end_time = time.time()
+        epoch_time = end_time - start_time
+        print('epoch [{}/{}], main_loss:{:.4f}, offset_loss:{:.4f}, vq_loss:{:.4f}, epoch_time:{}m{}s'.format(
+            epoch + 1, epochs, 
+            np.mean(loss_rec["main"]), np.mean(loss_rec["offset"]), np.mean(loss_rec["vq"]), 
+            int(epoch_time // 60), int(epoch_time % 60)))
 
         if (epoch + 1) % 10 == 0:
             auroc = evaluation(offset, encoder, bn, decoder, test_dataloader, device, _class_, mode, ifgeom)
@@ -145,7 +201,6 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
                 'decoder': decoder.state_dict()}, ckp_path)
             print('Auroc:{:.3f}'.format(auroc))
 
-        writer.add_scalar("AUC-ROC", auroc, global_step=epoch)
         writer.add_scalar("Training loss", loss, global_step=step)
         writer.add_scalar("Training main loss", main_loss, global_step=step)
         writer.add_scalar("Training offset loss", offset_loss, global_step=step)
@@ -159,7 +214,20 @@ if __name__ == '__main__':
     root_path = "D:\\Fauzan\\Study PhD\\Research\\Update DMAD\\dataset\\mvtec_anomaly_detection\\"
     ckpt_path = "D:\\Fauzan\\Study PhD\\Research\\Update DMAD\\dataset\\DMAD\\DMAD\\ckpt\\ppdm\\"
     setup_seed(111)
+    learning_rate = 0.005
+    batch_size = 8
     item_list = ['capsule', 'cable','screw','pill','carpet', 'bottle', 'hazelnut','leather', 'grid','transistor', 'metal_nut', 'toothbrush', 'zipper', 'tile', 'wood']
     for i in item_list:
-        tensorboard_log_dir = f"D:\\Fauzan\\Study PhD\\Research\\Update DMAD\\dataset\\DMAD\\DMAD\\runs\\DMAD\\MiniBatchSize8_LR0.005\\{i}"
+        start_total_time = time.time()
+
+        tensorboard_log_dir = f"D:\\Fauzan\\Study PhD\\Research\\DMAD\\runs\\DMAD\\BatchSize{batch_size}_LR{learning_rate}\\{i}"
         train_with_tensorboard(i, root_path, ckpt_path, ifgeom=i in ifgeom, tensorboard_log_dir=tensorboard_log_dir)
+
+        end_total_time = time.time()  # Record the end time of the entire training
+        total_training_time = end_total_time - start_total_time  # Calculate the total training time
+
+        total_hours, remainder = divmod(total_training_time, 3600)
+        total_minutes, total_seconds = divmod(remainder, 60)
+
+        print('Total Training Time: {} hours {} minutes {} seconds'.format(int(total_hours), int(total_minutes), int(total_seconds)))
+        
