@@ -35,9 +35,13 @@ def setup_seed(seed):
     torch.backends.cudnn.deterministic = True
 
 def loss_function(a, b):
+    mse_loss = torch.nn.MSELoss()
     cos_loss = torch.nn.CosineSimilarity()
     loss = 0
     for item in range(len(a)):
+        print(a[item].shape)
+        print(b[item].shape)
+        loss += 0.1*mse_loss(a[item], b[item])
         loss += torch.mean(1 - cos_loss(a[item].view(a[item].shape[0], -1), b[item].view(b[item].shape[0], -1)))
     return loss
 
@@ -54,49 +58,6 @@ def loss_concat(a, b):
     b_map = torch.cat(b_map, 1)
     loss += torch.mean(1 - cos_loss(a_map, b_map))
     return loss
-
-# def calculate_anomaly_image(orig_image_path, trained_image_path, anomaly_image_path):
-#     orig_image = cv2.imread(orig_image_path)
-#     trained_image = cv2.imread(trained_image_path)
-
-#     anomaly_image = cv2.absdiff(orig_image, trained_image)
-#     cv2.imwrite(anomaly_image_path, anomaly_image)
-
-# def add_anomaly_image_to_tensorboard(writer, orig_image_path, trained_image_path, anomaly_image_path, step):
-#     orig_image = cv2.imread(orig_image_path)
-#     trained_image = cv2.imread(trained_image_path)
-#     anomaly_image = cv2.imread(anomaly_image_path)
-
-#     orig_image_tensor = torch.from_numpy(orig_image).permute(2, 0, 1)
-#     trained_image_tensor = torch.from_numpy(trained_image).permute(2, 0, 1)
-#     anomaly_image_tensor = torch.from_numpy(anomaly_image).permute(2, 0, 1)
-
-#     writer.add_image("Original Image", orig_image_tensor, global_step=step)
-#     writer.add_image("Trained Image", trained_image_tensor, global_step=step)
-#     writer.add_image("Anomaly Image", anomaly_image_tensor, global_step=step)
-
-def add_images_to_tensorboard_and_save(writer, orig_image_path, trained_image_path, anomaly_image_path, step):
-    orig_image = cv2.imread(orig_image_path)
-    if orig_image is not None:
-        trained_image = cv2.imread(trained_image_path)
-        anomaly_image = cv2.imread(anomaly_image_path)
-
-        orig_image_tensor = torch.from_numpy(orig_image).permute(2, 0, 1)
-        trained_image_tensor = torch.from_numpy(trained_image).permute(2, 0, 1)
-        anomaly_image_tensor = torch.from_numpy(anomaly_image).permute(2, 0, 1)
-
-        # Add images to Tensorboard
-        writer.add_image("Original Image", orig_image_tensor, global_step=step)
-        writer.add_image("Trained Image", trained_image_tensor, global_step=step)
-        writer.add_image("Anomaly Image", anomaly_image_tensor, global_step=step)
-
-        # Save images to a directory
-        os.makedirs("images_to_save", exist_ok=True)
-        cv2.imwrite(f"images_to_save/original_{step}.jpg", orig_image)
-        cv2.imwrite(f"images_to_save/trained_{step}.jpg", trained_image)
-        cv2.imwrite(f"images_to_save/anomaly_{step}.jpg", anomaly_image)
-    else:
-        print(f"Failed to load the original image at path: {orig_image_path}")
 
 def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom=None, tensorboard_log_dir='./runs/DMAD/'):
     print(_class_)
@@ -141,13 +102,10 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
         offset.train()
         bn.train()
         decoder.train()
-        loss_rec = {"main": [0], "offset": [0], "vq": [0]}
-        accumulation_steps = 10
+        loss_rec = {"main": [0],
+                    "offset": [0],
+                    "vq": [0]}
         for k, (img, label) in enumerate(train_dataloader):
-            cv2.imshow("Original Image", img[0].cpu().numpy().transpose(1, 2, 0) * 255)
-            cv2.waitKey(0)  # Wait until a key is pressed
-            cv2.destroyAllWindows()
-
             img = img.to(device)
             _, img_, offset_loss = offset(img)
             inputs = encoder(img_)
@@ -156,28 +114,13 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
 
             main_loss = loss_function(inputs, outputs)
             loss = main_loss + offset_loss + vq_loss
-            loss = loss / accumulation_steps  # Normalize the loss
-
+            
             losses.append(loss.item())
 
             optimizer.zero_grad()
             loss.backward()
 
-            # Save the trained image
-            trained_image = outputs[0].cpu().detach().numpy().transpose(1, 2, 0)
-            trained_image = (trained_image * 255).astype(np.uint8)
-            cv2.imwrite("trained_image.jpg", trained_image)
-
-            # if (k + 1) % accumulation_steps == 0:
             optimizer.step()
-            optimizer.zero_grad()
-  
-            # orig_image_path = f"./original_images/{epoch}_{k}.jpg"
-            # trained_image_path = f"./trained_images/{epoch}_{k}.jpg"
-            # anomaly_image_path = f"./anomaly_images/{epoch}_{k}.jpg"
-
-            # Add images to Tensorboard and save to a directory
-            # add_images_to_tensorboard_and_save(writer, orig_image_path, trained_image_path, anomaly_image_path, step)
             
             loss_rec["main"].append(main_loss.item())
             loss_rec["offset"].append(offset_loss.item())
@@ -199,7 +142,7 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
                 'offset': offset.state_dict(),
                 'bn': bn.state_dict(),
                 'decoder': decoder.state_dict()}, ckp_path)
-            print('Auroc:{:.3f}'.format(auroc))
+            print('AUC-ROC:{:.3f}'.format(auroc))
 
         writer.add_scalar("Training loss", loss, global_step=step)
         writer.add_scalar("Training main loss", main_loss, global_step=step)

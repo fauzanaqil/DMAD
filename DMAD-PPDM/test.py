@@ -15,6 +15,7 @@ from numpy import ndarray
 from statistics import mean
 from scipy.ndimage import gaussian_filter
 import pickle
+import os
 
 def cal_anomaly_map(fs_list, ft_list, out_size=224, amap_mode='mul'):
     if amap_mode == 'mul':
@@ -76,10 +77,10 @@ def evaluation(offset, encoder, bn, decoder, dataloader,device,_class_=None, mod
             anomaly_map, _ = cal_anomaly_map(inputs, outputs, img.shape[-1], amap_mode='a')
             anomaly_map = F.grid_sample(F.grid_sample(torch.from_numpy(anomaly_map).float().cuda()[None, None], grid2_, align_corners=True), grid1_, align_corners=True).cpu().numpy()
             anomaly_map = gaussian_filter(anomaly_map, sigma=4)
-            #anomaly_os1 = F.grid_sample(offset1[None].detach(), grid2, align_corners=True).to('cpu').numpy()
-            #anomaly_os1 = gaussian_filter(anomaly_os1, sigma=4)
-            #anomaly_os2 = offset2[None].detach().to('cpu').numpy()
-            #anomaly_os2 = gaussian_filter(anomaly_os2, sigma=4)
+            anomaly_os1 = F.grid_sample(offset1[None].detach(), grid2, align_corners=True).to('cpu').numpy()
+            anomaly_os1 = gaussian_filter(anomaly_os1, sigma=4)
+            anomaly_os2 = offset2[None].detach().to('cpu').numpy()
+            anomaly_os2 = gaussian_filter(anomaly_os2, sigma=4)
             anomaly_os1 = (F.grid_sample(offset1[None].detach(), grid2, align_corners=True)+offset2[None].detach()).to('cpu').numpy()
             anomaly_os1 = gaussian_filter(anomaly_os1, sigma=4)
             anomaly_os2 = (F.grid_sample(offset2_[None].detach(), grid1_, align_corners=True)+offset1_[None].detach()).to('cpu').numpy()
@@ -170,9 +171,9 @@ def visualization(_class_):
         for img, gt, label, _ in test_dataloader:
             if (label.item() == 0):
                 continue
-            #if count <= 10:
-            #    count += 1
-            #    continue
+            if count <= 10:
+                count += 1
+                continue
 
             decoder.eval()
             bn.eval()
@@ -181,10 +182,9 @@ def visualization(_class_):
             inputs = encoder(img)
             outputs = decoder(bn(inputs))
 
-            #inputs.append(feature)
-            #inputs.append(outputs)
-            #t_sne(inputs)
-
+            # inputs.append(feature)
+            # inputs.append(outputs)
+            # t_sne(inputs)
 
             anomaly_map, amap_list = cal_anomaly_map([inputs[-1]], [outputs[-1]], img.shape[-1], amap_mode='a')
             anomaly_map = gaussian_filter(anomaly_map, sigma=4)
@@ -192,48 +192,47 @@ def visualization(_class_):
             ano_map = cvt2heatmap(ano_map*255)
             img = cv2.cvtColor(img.permute(0, 2, 3, 1).cpu().numpy()[0] * 255, cv2.COLOR_BGR2RGB)
             img = np.uint8(min_max_norm(img)*255)
-            #if not os.path.exists('./results_all/'+_class_):
-            #    os.makedirs('./results_all/'+_class_)
-            #cv2.imwrite('./results_all/'+_class_+'/'+str(count)+'_'+'org.png',img)
-            #plt.imshow(img)
-            #plt.axis('off')
-            #plt.savefig('org.png')
-            #plt.show()
+            if not os.path.exists('./results_all/'+_class_):
+               os.makedirs('./results_all/'+_class_)
+            cv2.imwrite('./results_all/'+_class_+'/'+str(count)+'_'+'org.png',img)
+            plt.imshow(img)
+            plt.axis('off')
+            plt.savefig('org.png')
+            plt.show()
             ano_map = show_cam_on_image(img, ano_map)
-            #cv2.imwrite('./results_all/'+_class_+'/'+str(count)+'_'+'ad.png', ano_map)
+            cv2.imwrite('./results_all/'+_class_+'/'+str(count)+'_'+'ad.png', ano_map)
             plt.imshow(ano_map)
             plt.axis('off')
-            #plt.savefig('ad.png')
+            plt.savefig('ad.png')
             plt.show()
 
             gt = gt.cpu().numpy().astype(int)[0][0]*255
-            #cv2.imwrite('./results/'+_class_+'_'+str(count)+'_'+'gt.png', gt)
+            cv2.imwrite('./results/'+_class_+'_'+str(count)+'_'+'gt.png', gt)
 
-            #b, c, h, w = inputs[2].shape
-            #t_feat = F.normalize(inputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
-            #s_feat = F.normalize(outputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
-            #c = 1-min_max_norm(cv2.resize(anomaly_map,(h,w))).flatten()
-            #print(c.shape)
-            #t_sne([t_feat, s_feat], c)
-            #assert 1 == 2
+            b, c, h, w = inputs[2].shape
+            t_feat = F.normalize(inputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
+            s_feat = F.normalize(outputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
+            c = 1-min_max_norm(cv2.resize(anomaly_map,(h,w))).flatten()
+            print(c.shape)
+            # t_sne([t_feat, s_feat], c)
+            assert 1 == 2
 
-            #name = 0
-            #for anomaly_map in amap_list:
-            #    anomaly_map = gaussian_filter(anomaly_map, sigma=4)
-            #    ano_map = min_max_norm(anomaly_map)
-            #    ano_map = cvt2heatmap(ano_map * 255)
-                #ano_map = show_cam_on_image(img, ano_map)
-                #cv2.imwrite(str(name) + '.png', ano_map)
-                #plt.imshow(ano_map)
-                #plt.axis('off')
-                #plt.savefig(str(name) + '.png')
-                #plt.show()
-            #    name+=1
+            name = 0
+            for anomaly_map in amap_list:
+                anomaly_map = gaussian_filter(anomaly_map, sigma=4)
+                ano_map = min_max_norm(anomaly_map)
+                ano_map = cvt2heatmap(ano_map * 255)
+                ano_map = show_cam_on_image(img, ano_map)
+                cv2.imwrite(str(name) + '.png', ano_map)
+                plt.imshow(ano_map)
+                plt.axis('off')
+                plt.savefig(str(name) + '.png')
+                plt.show()
+                name+=1
             count += 1
-            #if count>20:
-            #    return 0
-                #assert 1==2
-
+            if count>20:
+               return 0
+            assert 1==2
 
 def vis_nd(name, _class_):
     print(name,':',_class_)
@@ -243,11 +242,11 @@ def vis_nd(name, _class_):
     ckp_path = './checkpoints/' + name + '_' + str(_class_) + '.pth'
     train_dataloader, test_dataloader = load_data(name, _class_, batch_size=16)
 
-    encoder, bn = resnet18(pretrained=True)
+    # encoder, bn = resnet18(pretrained=True)
     encoder = encoder.to(device)
     bn = bn.to(device)
     encoder.eval()
-    decoder = de_resnet18(pretrained=False)
+    # decoder = de_resnet18(pretrained=False)
     decoder = decoder.to(device)
 
     ckp = torch.load(ckp_path)
@@ -266,60 +265,59 @@ def vis_nd(name, _class_):
         for img, label in test_dataloader:
             if img.shape[1] == 1:
                 img = img.repeat(1, 3, 1, 1)
-            #if count <= 10:
-            #    count += 1
-            #    continue
+            if count <= 10:
+                count += 1
+                continue
             img = img.to(device)
             inputs = encoder(img)
-            #print(inputs[-1].shape)
+            print(inputs[-1].shape)
             outputs = decoder(bn(inputs))
 
-
             anomaly_map, amap_list = cal_anomaly_map(inputs, outputs, img.shape[-1], amap_mode='a')
-            #anomaly_map = gaussian_filter(anomaly_map, sigma=4)
+            anomaly_map = gaussian_filter(anomaly_map, sigma=4)
             ano_map = min_max_norm(anomaly_map)
             ano_map = cvt2heatmap(ano_map*255)
             img = cv2.cvtColor(img.permute(0, 2, 3, 1).cpu().numpy()[0] * 255, cv2.COLOR_BGR2RGB)
             img = np.uint8(min_max_norm(img)*255)
             cv2.imwrite('./nd_results/'+name+'_'+str(_class_)+'_'+str(count)+'_'+'org.png',img)
-            #plt.imshow(img)
-            #plt.axis('off')
-            #plt.savefig('org.png')
-            #plt.show()
+            plt.imshow(img)
+            plt.axis('off')
+            plt.savefig('org.png')
+            plt.show()
             ano_map = show_cam_on_image(img, ano_map)
             cv2.imwrite('./nd_results/'+name+'_'+str(_class_)+'_'+str(count)+'_'+'ad.png', ano_map)
-            #plt.imshow(ano_map)
-            #plt.axis('off')
-            #plt.savefig('ad.png')
-            #plt.show()
+            plt.imshow(ano_map)
+            plt.axis('off')
+            plt.savefig('ad.png')
+            plt.show()
 
-            #gt = gt.cpu().numpy().astype(int)[0][0]*255
-            #cv2.imwrite('./results/'+_class_+'_'+str(count)+'_'+'gt.png', gt)
+            gt = gt.cpu().numpy().astype(int)[0][0]*255
+            cv2.imwrite('./results/'+_class_+'_'+str(count)+'_'+'gt.png', gt)
 
-            #b, c, h, w = inputs[2].shape
-            #t_feat = F.normalize(inputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
-            #s_feat = F.normalize(outputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
-            #c = 1-min_max_norm(cv2.resize(anomaly_map,(h,w))).flatten()
-            #print(c.shape)
-            #t_sne([t_feat, s_feat], c)
-            #assert 1 == 2
+            b, c, h, w = inputs[2].shape
+            t_feat = F.normalize(inputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
+            s_feat = F.normalize(outputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
+            c = 1-min_max_norm(cv2.resize(anomaly_map,(h,w))).flatten()
+            print(c.shape)
+            # t_sne([t_feat, s_feat], c)
+            assert 1 == 2
 
-            #name = 0
-            #for anomaly_map in amap_list:
-            #    anomaly_map = gaussian_filter(anomaly_map, sigma=4)
-            #    ano_map = min_max_norm(anomaly_map)
-            #    ano_map = cvt2heatmap(ano_map * 255)
-                #ano_map = show_cam_on_image(img, ano_map)
-                #cv2.imwrite(str(name) + '.png', ano_map)
-                #plt.imshow(ano_map)
-                #plt.axis('off')
-                #plt.savefig(str(name) + '.png')
-                #plt.show()
-            #    name+=1
-            #count += 1
-            #if count>40:
-            #    return 0
-                #assert 1==2
+            name = 0
+            for anomaly_map in amap_list:
+                anomaly_map = gaussian_filter(anomaly_map, sigma=4)
+                ano_map = min_max_norm(anomaly_map)
+                ano_map = cvt2heatmap(ano_map * 255)
+                ano_map = show_cam_on_image(img, ano_map)
+                cv2.imwrite(str(name) + '.png', ano_map)
+                plt.imshow(ano_map)
+                plt.axis('off')
+                plt.savefig(str(name) + '.png')
+                plt.show()
+                name+=1
+            count += 1
+            if count>40:
+                return 0
+            assert 1==2
             gt_list_sp.extend(label.cpu().data.numpy())
             prmax_list_sp.append(np.max(anomaly_map))
             prmean_list_sp.append(np.sum(anomaly_map))  # np.sum(anomaly_map.ravel().argsort()[-1:][::-1]))
@@ -334,8 +332,8 @@ def vis_nd(name, _class_):
         vis_data = {}
         vis_data['Anomaly Score'] = ano_score
         vis_data['Ground Truth'] = np.array(gt_list_sp)
-        #print(type(vis_data))
-        #np.save('vis.npy',vis_data)
+        print(type(vis_data))
+        np.save('vis.npy',vis_data)
         with open('vis.pkl','wb') as f:
             pickle.dump(vis_data,f,pickle.HIGHEST_PROTOCOL)
 
@@ -391,11 +389,11 @@ def compute_pro(masks: ndarray, amaps: ndarray, num_th: int = 200) -> None:
     return pro_auc
 
 def detection(encoder, bn, decoder, dataloader,device,_class_):
-    #_, t_bn = resnet50(pretrained=True)
+    _, t_bn = resnet50(pretrained=True)
     bn.load_state_dict(bn.state_dict())
     bn.eval()
-    #t_bn.to(device)
-    #t_bn.load_state_dict(bn.state_dict())
+    t_bn.to(device)
+    t_bn.load_state_dict(bn.state_dict())
     decoder.eval()
     gt_list_sp = []
     prmax_list_sp = []
@@ -415,7 +413,7 @@ def detection(encoder, bn, decoder, dataloader,device,_class_):
 
             gt_list_sp.extend(label.cpu().data.numpy())
             prmax_list_sp.append(np.max(anomaly_map))
-            prmean_list_sp.append(np.sum(anomaly_map))#np.sum(anomaly_map.ravel().argsort()[-1:][::-1]))
+            prmean_list_sp.append(np.sum(anomaly_map)) #np.sum(anomaly_map.ravel().argsort()[-1:][::-1]))
 
         gt_list_sp = np.array(gt_list_sp)
         indx1 = gt_list_sp == _class_
