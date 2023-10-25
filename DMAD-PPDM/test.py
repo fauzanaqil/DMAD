@@ -120,8 +120,8 @@ def test(_class_):
     print(_class_)
 
     data_transform, gt_transform = get_data_transforms(256, 256)
-    test_path = '../mvtec/' + _class_
-    ckp_path = './checkpoints/' + 'rm_1105_wres50_ff_mm_' + _class_ + '.pth'
+    test_path = 'D:\\Fauzan\\Study PhD\\Research\\Update DMAD\\dataset\\mvtec_anomaly_detection\\' + _class_
+    ckp_path = 'D:\\Fauzan\\Study PhD\\Research\\Update DMAD\\dataset\\DMAD\\DMAD\\ckpt\\ppdm\\' + 'wres50_' + _class_ + '_I.pth'
     test_data = MVTecDataset(root=test_path, transform=data_transform, gt_transform=gt_transform, phase="test")
     test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=1, shuffle=False)
     encoder, bn = wide_resnet50_2(pretrained=True)
@@ -147,12 +147,12 @@ def visualization(_class_):
     print(device)
 
     data_transform, gt_transform = get_data_transforms(256, 256)
-    test_path = '../mvtec/' + _class_
-    ckp_path = './checkpoints/' + 'rm_1105_wres50_ff_mm_'+_class_+'.pth'
+    test_path = 'D:\\Fauzan\\Study PhD\\Research\\Update DMAD\\dataset\\mvtec_anomaly_detection\\' + _class_
+    ckp_path = 'D:\\Fauzan\\Study PhD\\Research\\Update DMAD\\dataset\\DMAD\\DMAD\\ckpt\\ppdm\\' + 'wres50_' + _class_ + '_I.pth'
     test_data = MVTecDataset(root=test_path, transform=data_transform, gt_transform=gt_transform, phase="test")
     test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=1, shuffle=False)
 
-    encoder, bn = wide_resnet50_2(pretrained=True)
+    encoder, bn, _ = wide_resnet50_2(pretrained=True)
     encoder = encoder.to(device)
     bn = bn.to(device)
 

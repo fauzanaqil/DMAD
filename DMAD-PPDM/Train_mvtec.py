@@ -7,7 +7,7 @@ import numpy as np
 import torch.optim as optim
 import torchvision.utils as vutils
 
-from test import evaluation
+from test import evaluation, visualization
 from dataset import MVTecDataset
 from resnet import wide_resnet50_2
 from torch.nn import functional as F
@@ -39,8 +39,8 @@ def loss_function(a, b):
     cos_loss = torch.nn.CosineSimilarity()
     loss = 0
     for item in range(len(a)):
-        print(a[item].shape)
-        print(b[item].shape)
+        # print(a[item].shape)
+        # print(b[item].shape)
         loss += 0.1*mse_loss(a[item], b[item])
         loss += torch.mean(1 - cos_loss(a[item].view(a[item].shape[0], -1), b[item].view(b[item].shape[0], -1)))
     return loss
@@ -61,7 +61,7 @@ def loss_concat(a, b):
 
 def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom=None, tensorboard_log_dir='./runs/DMAD/'):
     print(_class_)
-    epochs = 200
+    epochs = 100
     image_size = 256
     mode = "sp"
     gamma = 1
@@ -173,4 +173,4 @@ if __name__ == '__main__':
         total_minutes, total_seconds = divmod(remainder, 60)
 
         print('Total Training Time: {} hours {} minutes {} seconds'.format(int(total_hours), int(total_minutes), int(total_seconds)))
-        
+        visualization(i)
