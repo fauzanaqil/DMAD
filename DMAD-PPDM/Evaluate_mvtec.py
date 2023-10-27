@@ -81,8 +81,8 @@ def eval(_class_, rec, root, ckpt_path, ifgeom):
 
 
 if __name__ == '__main__':
-    root_path = "your dataset root path"
-    ckpt_path = "your ckpt path"
+    root_path = "D:\\Fauzan\\Study PhD\\Research\\DMAD\\mvtec_anomaly_detection\\"
+    ckpt_path = "D:\\Fauzan\\Study PhD\\Research\\DMAD\\dataset\\ckpt\\ppdm\\"
     item_list = ['capsule', 'cable','screw','pill','carpet', 'bottle', 'hazelnut','leather', 'grid','transistor', 'metal_nut', 'toothbrush', 'zipper', 'tile', 'wood']
     rec = []
     for i in item_list:
