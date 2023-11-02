@@ -99,8 +99,7 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
     writer = setup_tensorboard(tensorboard_log_dir)
 
     step = 0
-    count = 0
-    name = 0
+    order = 0
     for epoch in range(epochs):
         start_time = time.time()
         losses = []
@@ -142,60 +141,13 @@ def train_with_tensorboard(_class_, root='./mvtec/', ckpt_path='./ckpt/', ifgeom
             int(epoch_time // 60), int(epoch_time % 60)))
 
         if (epoch + 1) % 10 == 0:
-            auroc = evaluation(offset, encoder, bn, decoder, test_dataloader, device, _class_, mode, ifgeom)
+            auroc = evaluation(offset, encoder, bn, decoder, test_dataloader, device, _class_, mode, ifgeom, order)
             writer.add_scalar("AUC-ROC", auroc, global_step=epoch)
             torch.save({
                 'offset': offset.state_dict(),
                 'bn': bn.state_dict(),
                 'decoder': decoder.state_dict()}, ckp_path)
             print('AUC-ROC:{:.3f}'.format(auroc))
-
-            anomaly_map, amap_list = cal_anomaly_map([inputs[-1]], [outputs[-1]], img.shape[-1], amap_mode='a')
-            anomaly_map = gaussian_filter(anomaly_map, sigma=4)
-            ano_map = min_max_norm(anomaly_map)
-            ano_map = cvt2heatmap(ano_map*255)
-            img = cv2.cvtColor(img.permute(0, 2, 3, 1).cpu().numpy()[0] * 255, cv2.COLOR_BGR2RGB)
-            img = np.uint8(min_max_norm(img)*255)
-            if not os.path.exists('./results_all/'+_class_):
-               os.makedirs('./results_all/'+_class_)
-            cv2.imwrite('./results_all/'+_class_+'/'+str(count)+'_'+'org.png',img)
-            plt.imshow(img)
-            plt.axis('off')
-            plt.savefig('org.png')
-            plt.show()
-            ano_map = show_cam_on_image(img, ano_map)
-            cv2.imwrite('./results_all/'+_class_+'/'+str(count)+'_'+'ad.png', ano_map)
-            plt.imshow(ano_map)
-            plt.axis('off')
-            plt.savefig('ad.png')
-            plt.show()
-
-            # gt = gt.cpu().numpy().astype(int)[0][0]*255
-            # cv2.imwrite('./results/'+_class_+'_'+str(count)+'_'+'gt.png', gt)
-
-            b, c, h, w = inputs[2].shape
-            # t_feat = F.normalize(inputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
-            # s_feat = F.normalize(outputs[2], p=2).view(c, -1).permute(1, 0).cpu().numpy()
-            c = 1-min_max_norm(cv2.resize(anomaly_map,(h,w))).flatten()
-            print(c.shape)
-            # t_sne([t_feat, s_feat], c)
-            # assert 1 == 2
-
-            for anomaly_map in amap_list:
-                anomaly_map = gaussian_filter(anomaly_map, sigma=4)
-                ano_map = min_max_norm(anomaly_map)
-                ano_map = cvt2heatmap(ano_map * 255)
-                ano_map = show_cam_on_image(img, ano_map)
-                cv2.imwrite(str(name) + '.png', ano_map)
-                plt.imshow(ano_map)
-                plt.axis('off')
-                plt.savefig(str(name) + '.png')
-                plt.show()
-                name+=1
-            count += 1
-            if count > 20:
-               return 0
-            # assert 1 == 2
 
         writer.add_scalar("Training loss", loss, global_step=step)
         writer.add_scalar("Training main loss", main_loss, global_step=step)

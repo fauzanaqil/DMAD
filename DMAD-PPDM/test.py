@@ -54,7 +54,7 @@ def minmax(list):
     list = np.array(list)
     return (list - list.min()) / (list.max() - list.min() + 1e-8)
 
-def visualization_offset_image(offset_img, orig_img, _class_):
+def visualization_offset_image(offset_img, orig_img, _class_, order, number):
     ano_map = gaussian_filter(offset_img, sigma=4)
     ano_map = min_max_norm(ano_map)
     ano_map = ano_map[0, 0, :, :,]
@@ -63,14 +63,12 @@ def visualization_offset_image(offset_img, orig_img, _class_):
     ano_map = show_cam_on_image(orig_img[0].cpu(), ano_map)
     ano_map = np.clip(ano_map, 0, 255)
     ano_map = ano_map.transpose(1, 2, 0)
-    plt.imshow(ano_map)
-    cv2.imwrite('./results_all/'+_class_+'/'+'_'+'ad.png', ano_map)
+    cv2.imwrite('./results_all/'+_class_+'/'+ str(order) + str(number) + '_'+'ad.png', ano_map)
     plt.imshow(ano_map)
     plt.axis('off')
-    plt.savefig('ad.png')
     return ano_map
 
-def evaluation(offset, encoder, bn, decoder, dataloader,device,_class_=None, mode=None, ifgeom=True):
+def evaluation(offset, encoder, bn, decoder, dataloader,device,_class_=None, mode=None, ifgeom=True, order=0):
     offset.eval()
     bn.eval()
     decoder.eval()
@@ -92,16 +90,17 @@ def evaluation(offset, encoder, bn, decoder, dataloader,device,_class_=None, mod
             outputs = decoder(vq)
             anomaly_map, _ = cal_anomaly_map(inputs, outputs, img.shape[-1], amap_mode='a')
             anomaly_map = F.grid_sample(F.grid_sample(torch.from_numpy(anomaly_map).float().cuda()[None, None], grid2_, align_corners=True), grid1_, align_corners=True).cpu().numpy()
-            anomaly_map = visualization_offset_image(anomaly_map, img, _class_)
+            anomaly_map = visualization_offset_image(anomaly_map, img, _class_, order, 1)
             anomaly_os1 = F.grid_sample(offset1[None].detach(), grid2, align_corners=True).to('cpu').numpy()
-            anomaly_os1 = visualization_offset_image(anomaly_os1, img, _class_)
+            anomaly_os1 = visualization_offset_image(anomaly_os1, img, _class_, order, 2)
             anomaly_os2 = offset2[None].detach().to('cpu').numpy()
-            anomaly_os2 = visualization_offset_image(anomaly_os2, img, _class_)
+            anomaly_os2 = visualization_offset_image(anomaly_os2, img, _class_, order, 3)
             anomaly_os1 = (F.grid_sample(offset1[None].detach(), grid2, align_corners=True) + offset2[None].detach()).to('cpu').numpy()
-            anomaly_os1 = visualization_offset_image(anomaly_os1, img, _class_)
+            anomaly_os1 = visualization_offset_image(anomaly_os1, img, _class_, order, 4)
             anomaly_os2 = (F.grid_sample(offset2_[None].detach(), grid1_, align_corners=True) + offset1_[None].detach()).to('cpu').numpy()
-            anomaly_os2 = visualization_offset_image(anomaly_os2, img, _class_)
-
+            anomaly_os2 = visualization_offset_image(anomaly_os2, img, _class_, order, 5)
+            
+            order=+1
             gt[gt > 0.5] = 1
             gt[gt <= 0.5] = 0
             if mode == "px":
@@ -154,7 +153,6 @@ def test(_class_):
     auroc_px, auroc_sp, aupro_px = evaluation(encoder, bn, decoder, test_dataloader, device,_class_)
     print(_class_,':',auroc_px,',',auroc_sp,',',aupro_px)
     return auroc_px
-
 
 def visualization(_class_):
     print(_class_)
