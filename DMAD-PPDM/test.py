@@ -63,6 +63,8 @@ def visualization_offset_image(offset_img, orig_img, _class_, order, number):
     ano_map = show_cam_on_image(orig_img[0].cpu(), ano_map)
     ano_map = np.clip(ano_map, 0, 255)
     ano_map = ano_map.transpose(1, 2, 0)
+    if not os.path.exists('./results_all/'+_class_):
+        os.makedirs('./results_all/'+_class_)
     cv2.imwrite('./results_all/'+_class_+'/'+ str(order) + str(number) + '_'+'ad.png', ano_map)
     plt.imshow(ano_map)
     plt.axis('off')
