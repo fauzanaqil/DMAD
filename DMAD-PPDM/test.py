@@ -175,9 +175,9 @@ def visualization(_class_):
     decoder = de_wide_resnet50_2(pretrained=False)
     decoder = decoder.to(device)
     ckp = torch.load(ckp_path)
-    for k, v in list(ckp['bn'].items()):
-        if 'memory' in k:
-            ckp['bn'].pop(k)
+    # for k, v in list(ckp['bn'].items()):
+    #     if 'memory' in k:
+    #         ckp['bn'].pop(k)
     decoder.load_state_dict(ckp['decoder'], strict=False)
     bn.load_state_dict(ckp['bn'], strict=False)
 

@@ -6,7 +6,7 @@ import os
 from resnet import wide_resnet50_2
 from de_resnet import de_wide_resnet50_2
 from dataset import MVTecDataset
-from test import evaluation
+from test import evaluation, visualization
 from torch.nn import functional as F
 
 ifgeom = ['screw', 'carpet', 'metal_nut'] # include geometrical changes AND discrimination of feature similarity is weak
@@ -87,4 +87,5 @@ if __name__ == '__main__':
     rec = []
     for i in item_list:
         rec.append(eval(i, rec, root_path, ckpt_path, ifgeom=i in ifgeom))
+        visualization(i)
     print(rec)
