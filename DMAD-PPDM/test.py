@@ -55,8 +55,7 @@ def minmax(list):
     return (list - list.min()) / (list.max() - list.min() + 1e-8)
 
 def visualization_offset_image(offset_img, orig_img, _class_, order, number):
-    ano_map = gaussian_filter(offset_img, sigma=4)
-    ano_map = min_max_norm(ano_map)
+    ano_map = min_max_norm(offset_img)
     ano_map = ano_map[0, 0, :, :,]
     ano_map = cvt2heatmap(ano_map*255)
     ano_map = ano_map.transpose(2, 0, 1)
@@ -68,7 +67,6 @@ def visualization_offset_image(offset_img, orig_img, _class_, order, number):
     cv2.imwrite('./results_all/'+_class_+'/'+ str(order) + str(number) + '_'+'ad.png', ano_map)
     plt.imshow(ano_map)
     plt.axis('off')
-    return ano_map
 
 def evaluation(offset, encoder, bn, decoder, dataloader,device,_class_=None, mode=None, ifgeom=True, order=0):
     offset.eval()
@@ -92,15 +90,25 @@ def evaluation(offset, encoder, bn, decoder, dataloader,device,_class_=None, mod
             outputs = decoder(vq)
             anomaly_map, _ = cal_anomaly_map(inputs, outputs, img.shape[-1], amap_mode='a')
             anomaly_map = F.grid_sample(F.grid_sample(torch.from_numpy(anomaly_map).float().cuda()[None, None], grid2_, align_corners=True), grid1_, align_corners=True).cpu().numpy()
-            anomaly_map = visualization_offset_image(anomaly_map, img, _class_, order, 1)
-            anomaly_os1 = F.grid_sample(offset1[None].detach(), grid2, align_corners=True).to('cpu').numpy()
-            anomaly_os1 = visualization_offset_image(anomaly_os1, img, _class_, order, 2)
-            anomaly_os2 = offset2[None].detach().to('cpu').numpy()
-            anomaly_os2 = visualization_offset_image(anomaly_os2, img, _class_, order, 3)
+            anomaly_map = gaussian_filter(anomaly_map, sigma=4)
+            visualization_offset_image(anomaly_map, img, _class_, order, 1)
+            
+            # anomaly_os1 = F.grid_sample(offset1[None].detach(), grid2, align_corners=True).to('cpu').numpy()
+            # anomaly_os1 = gaussian_filter(anomaly_os1, sigma=4)
+            # visualization_offset_image(anomaly_os1, img, _class_, order, 2)
+            
+            # anomaly_os2 = offset2[None].detach().to('cpu').numpy()
+            # anomaly_os2 = gaussian_filter(anomaly_os2, sigma=4)
+            # visualization_offset_image(anomaly_os2, img, _class_, order, 3)
+            
             anomaly_os1 = (F.grid_sample(offset1[None].detach(), grid2, align_corners=True) + offset2[None].detach()).to('cpu').numpy()
-            anomaly_os1 = visualization_offset_image(anomaly_os1, img, _class_, order, 4)
+            anomaly_os1 = gaussian_filter(anomaly_os1, sigma=4)
+            visualization_offset_image(anomaly_os1, img, _class_, order, 2)
+            
             anomaly_os2 = (F.grid_sample(offset2_[None].detach(), grid1_, align_corners=True) + offset1_[None].detach()).to('cpu').numpy()
-            anomaly_os2 = visualization_offset_image(anomaly_os2, img, _class_, order, 5)
+            anomaly_os2 = gaussian_filter(anomaly_os2, sigma=4)
+            visualization_offset_image(anomaly_os2, img, _class_, order, 3)
+            
             
             order=+1
             gt[gt > 0.5] = 1

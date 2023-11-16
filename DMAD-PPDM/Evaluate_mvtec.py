@@ -75,10 +75,8 @@ def eval(_class_, rec, root, ckpt_path, ifgeom):
     decoder.load_state_dict(ckp['decoder'], strict=False)
     bn.load_state_dict(ckp['bn'], strict=False)
     offset.load_state_dict(ckp['offset'], strict=False)
-    auroc_px, auroc_sp = evaluation(offset, encoder, bn, decoder, test_dataloader, device, _class_, mode, ifgeom)
-
-    return auroc_sp if mode=="sp" else auroc_px
-
+    result = evaluation(offset, encoder, bn, decoder, test_dataloader, device, _class_, mode, ifgeom)
+    return result
 
 if __name__ == '__main__':
     root_path = "D:\\Fauzan\\Study PhD\\Research\\DMAD\\mvtec_anomaly_detection\\"
@@ -87,5 +85,4 @@ if __name__ == '__main__':
     rec = []
     for i in item_list:
         rec.append(eval(i, rec, root_path, ckpt_path, ifgeom=i in ifgeom))
-        visualization(i)
     print(rec)
